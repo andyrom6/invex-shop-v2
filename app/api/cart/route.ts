@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { isSubscriptionProduct } from '@/lib/product-utils';
 import { ProductMetadata, CartItem } from '@/types/product';
+import { SALE_ACTIVE, SALE_DISCOUNT } from '@/lib/constants';
 import { z } from 'zod';
 
 // Validation schemas
@@ -14,18 +15,35 @@ const ProductMetadataSchema = z.object({
   requires_shipping: z.string().optional()
 });
 
-const CartActionSchema = z.object({
-  action: z.enum(['add', 'remove', 'update-quantity']),
-  item: z.object({
-    id: z.string(),
-    name: z.string(),
-    price: z.number().positive(),
-    currency: z.string(),
-    quantity: z.number().min(0),
-    image: z.string(),
-    metadata: ProductMetadataSchema
+const CartActionSchema = z.discriminatedUnion('action', [
+  z.object({
+    action: z.literal('add'),
+    item: z.object({
+      id: z.string(),
+      name: z.string(),
+      price: z.number().positive(),
+      currency: z.string(),
+      quantity: z.number().min(0),
+      image: z.string(),
+      metadata: ProductMetadataSchema,
+      originalPrice: z.number().positive().optional(),
+      saleActive: z.boolean().optional()
+    })
+  }),
+  z.object({
+    action: z.literal('remove'),
+    item: z.object({
+      id: z.string()
+    })
+  }),
+  z.object({
+    action: z.literal('update-quantity'),
+    item: z.object({
+      id: z.string(),
+      quantity: z.number().min(0)
+    })
   })
-});
+]);
 
 function parseCartData(cartData: string | null): CartItem[] {
   if (!cartData) return [];
@@ -95,6 +113,12 @@ export async function POST(request: Request) {
             cart[existingItemIndex].quantity += 1;
           }
         } else {
+          // Apply sale discount if active
+          if (SALE_ACTIVE) {
+            item.originalPrice = item.price;
+            item.price = item.price * (1 - SALE_DISCOUNT);
+            item.saleActive = true;
+          }
           cart.push(item);
         }
         break;

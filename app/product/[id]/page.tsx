@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import { Button } from "@/components/ui/button"
 import { ShoppingCart, Star, Heart, Share2, Sparkles, Shield, Truck, RefreshCw, ArrowLeft } from "lucide-react"
+import { SALE_ACTIVE, SALE_DISCOUNT, SALE_PERCENTAGE } from '@/lib/constants'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from "sonner"
@@ -74,11 +75,9 @@ const ImageGallery = ({ images, name }: { images: string[], name: string }) => {
 }
 
 const ProductFeatures = () => (
-  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
+  <div className="grid grid-cols-2 gap-4 mt-8">
     {[
       { icon: Shield, title: "Secure Payment", desc: "100% Protected" },
-      { icon: Truck, title: "Fast Delivery", desc: "Free on orders >$50" },
-      { icon: RefreshCw, title: "Easy Returns", desc: "30 Day Returns" },
       { icon: Sparkles, title: "Quality Product", desc: "Verified Seller" }
     ].map((feature, index) => (
       <motion.div
@@ -363,44 +362,73 @@ export default function ProductPage({ params }: { params: { id: string } }) {
             </div>
 
             <motion.div 
-              className="text-5xl font-black mb-8"
+              className="flex items-baseline gap-4 mb-8"
               initial={{ scale: 0.5, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.3 }}
             >
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600">
-                {new Intl.NumberFormat('en-US', {
-                  style: 'currency',
-                  currency: product.currency,
-                }).format(product.price)}
-              </span>
+              {SALE_ACTIVE ? (
+                <>
+                  <span className="text-5xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600">
+                    {new Intl.NumberFormat('en-US', {
+                      style: 'currency',
+                      currency: product.currency,
+                    }).format(product.price * (1 - SALE_DISCOUNT))}
+                  </span>
+                  <span className="text-2xl font-medium text-gray-400 line-through">
+                    {new Intl.NumberFormat('en-US', {
+                      style: 'currency',
+                      currency: product.currency,
+                    }).format(product.price)}
+                  </span>
+                  <motion.span 
+                    className="text-lg font-semibold text-red-500"
+                    initial={{ scale: 1 }}
+                    animate={{ scale: [1, 1.1, 1] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                  >
+                    -{SALE_PERCENTAGE}% OFF
+                  </motion.span>
+                </>
+              ) : (
+                <span className="text-5xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600">
+                  {new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: product.currency,
+                  }).format(product.price)}
+                </span>
+              )}
             </motion.div>
 
             <div className="flex flex-wrap gap-2 mb-8">
-              {Object.entries(product.metadata).map(([key, value]) => {
-                if (!value) return null
-                return (
-                  <motion.span
-                    key={key}
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    whileHover={{ scale: 1.05 }}
-                    className="inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ring-1 ring-inset"
-                    style={{
-                      backgroundColor: key === 'category' ? 'rgb(243, 244, 246)' :
-                        key === 'type' ? 'rgb(239, 246, 255)' :
-                        key === 'delivery' ? 'rgb(240, 253, 244)' :
-                        key === 'isSubscription' ? 'rgb(245, 243, 255)' : 'white',
-                      color: key === 'category' ? 'rgb(31, 41, 55)' :
-                        key === 'type' ? 'rgb(29, 78, 216)' :
-                        key === 'delivery' ? 'rgb(21, 128, 61)' :
-                        key === 'isSubscription' ? 'rgb(109, 40, 217)' : 'black'
-                    }}
-                  >
-                    {value}
-                  </motion.span>
-                )
-              })}
+              {Object.entries(product.metadata)
+                .filter(([key]) => ['category', 'type', 'delivery'].includes(key))
+                .map(([key, value]) => {
+                  if (!value) return null;
+                  return (
+                    <motion.span
+                      key={key}
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      whileHover={{ scale: 1.05 }}
+                      className="inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ring-1 ring-inset"
+                      style={{
+                        backgroundColor: 
+                          key === 'category' ? 'rgb(243, 244, 246)' :
+                          key === 'type' ? 'rgb(239, 246, 255)' :
+                          key === 'delivery' ? 'rgb(240, 253, 244)' :
+                          'white',
+                        color: 
+                          key === 'category' ? 'rgb(31, 41, 55)' :
+                          key === 'type' ? 'rgb(29, 78, 216)' :
+                          key === 'delivery' ? 'rgb(21, 128, 61)' :
+                          'black'
+                      }}
+                    >
+                      {value}
+                    </motion.span>
+                  );
+                })}
             </div>
 
             <div className="prose prose-blue max-w-none mb-8">

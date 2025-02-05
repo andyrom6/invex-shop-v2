@@ -6,7 +6,8 @@ import { useEffect, useState } from "react"
 import { ArrowRightIcon } from '@heroicons/react/24/outline'
 import { motion, AnimatePresence, useScroll, useMotionValueEvent } from "framer-motion"
 import { FaDiscord, FaTiktok } from 'react-icons/fa'
-import { ShoppingBag, X } from "lucide-react"
+import { ShoppingBag, X, Tag } from "lucide-react"
+import { SALE_ACTIVE, SALE_PERCENTAGE } from '@/lib/constants'
 import { useCart } from '@/contexts/cart-context'
 import Image from 'next/image'
 

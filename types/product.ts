@@ -19,4 +19,6 @@ export interface Product {
 export interface CartItem extends Omit<Product, 'images' | 'description'> {
   image: string;
   quantity: number;
+  originalPrice?: number;
+  saleActive?: boolean;
 }

@@ -2,11 +2,12 @@
 
 import { useEffect, useState, forwardRef } from 'react'
 import { Button } from "@/components/ui/button"
-import { Filter, Sparkles } from 'lucide-react'
+import { Filter, Sparkles, Tag } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { motion, AnimatePresence } from "framer-motion"
 import { getProductImage } from '@/lib/product-utils'
+import { SALE_ACTIVE, SALE_DISCOUNT, SALE_PERCENTAGE } from '@/lib/constants'
 
 interface Product {
   id: string
@@ -108,6 +109,19 @@ const ProductCard = forwardRef<HTMLDivElement, ProductCardProps>(({ product, ind
                 className="object-cover transition-transform duration-700"
                 onError={() => setImageError(true)}
               />
+              {SALE_ACTIVE && (
+                <motion.div 
+                  className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded-full text-sm font-medium"
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: index * 0.05 + 0.2 }}
+                >
+                  <div className="flex items-center gap-1">
+                    <Tag className="h-3 w-3" />
+                    <span>{SALE_PERCENTAGE}% OFF</span>
+                  </div>
+                </motion.div>
+              )}
               <motion.div
                 className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-purple-600/10 opacity-0 transition-opacity duration-300"
                 whileHover={{ opacity: 1 }}
@@ -121,15 +135,42 @@ const ProductCard = forwardRef<HTMLDivElement, ProductCardProps>(({ product, ind
             >
               {product.name}
             </motion.h3>
-            <motion.p 
-              className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600"
-              whileHover={{ scale: 1.05 }}
-            >
-              {new Intl.NumberFormat('en-US', {
-                style: 'currency',
-                currency: product.currency,
-              }).format(product.price)}
-            </motion.p>
+            <div>
+              {SALE_ACTIVE ? (
+                <>
+                  <motion.p 
+                    className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600"
+                    whileHover={{ scale: 1.05 }}
+                  >
+                    {new Intl.NumberFormat('en-US', {
+                      style: 'currency',
+                      currency: product.currency,
+                    }).format(product.price * (1 - SALE_DISCOUNT))}
+                  </motion.p>
+                  <motion.p 
+                    className="text-sm text-gray-400 line-through"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.2 }}
+                  >
+                    {new Intl.NumberFormat('en-US', {
+                      style: 'currency',
+                      currency: product.currency,
+                    }).format(product.price)}
+                  </motion.p>
+                </>
+              ) : (
+                <motion.p 
+                  className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600"
+                  whileHover={{ scale: 1.05 }}
+                >
+                  {new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: product.currency,
+                  }).format(product.price)}
+                </motion.p>
+              )}
+            </div>
           </div>
         </motion.div>
       </Link>
