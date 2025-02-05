@@ -3,6 +3,9 @@ import { Cross2Icon } from "@radix-ui/react-icons"
 import * as ToastPrimitive from "@radix-ui/react-toast"
 import { cn } from "@/lib/utils"
 
+export type ToastProps = React.ComponentPropsWithoutRef<typeof ToastPrimitive.Root>
+export type ToastActionElement = React.ReactElement<typeof ToastAction>
+
 const ToastProvider = ToastPrimitive.Provider
 
 const ToastViewport = React.forwardRef<

@@ -251,7 +251,7 @@ export default function Navbar() {
               </Button>
             </Link>
             
-            <Link href="https://invexpro.com/login" target="_blank" rel="noopener noreferrer">
+            <Link href="https://invex-pro-web.vercel.app/" target="_blank" rel="noopener noreferrer">
               <Button 
                 className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white border-0"
               >

@@ -5,11 +5,15 @@ export function isSubscriptionProduct(metadata: ProductMetadata): boolean {
 }
 
 export function isPhysicalProduct(metadata: ProductMetadata): boolean {
+  const type = metadata.type?.toLowerCase() ?? '';
+  const category = metadata.category?.toLowerCase() ?? '';
+  const delivery = metadata.delivery?.toLowerCase() ?? '';
+
   return (
-    metadata.type?.toLowerCase() === 'physical' ||
+    type === 'physical' ||
     metadata.requires_shipping === 'true' ||
-    metadata.category?.toLowerCase() === 'cologne' ||
-    metadata.delivery?.toLowerCase().includes('days')
+    category === 'cologne' ||
+    delivery.includes('days')
   );
 }
 
