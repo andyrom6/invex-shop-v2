@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="500" height="500" viewBox="0 0 500 500" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="250" cy="250" r="240" stroke="black" stroke-width="20"/>
+  <g transform="translate(100, 150) scale(0.6)">
+    <path d="M250 50 L400 200 L350 250 L250 150 L150 250 L100 200 L250 50Z" fill="black"/>
+    <rect x="225" y="150" width="50" height="150" fill="black"/>
+    <path d="M150 300 L350 300 L350 350 L150 350 Z" fill="black"/>
+  </g>
+  <text x="250" y="400" text-anchor="middle" font-family="Arial" font-weight="bold" font-size="72" fill="black">INVEX</text>
+</svg>
