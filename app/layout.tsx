@@ -4,6 +4,7 @@ import { Inter } from 'next/font/google';
 import Navbar from '@/components/navbar';
 import { Toaster } from "sonner";
 import { CartProvider } from '@/contexts/cart-context';
+import { SaleBanner } from '@/components/sale-banner';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -21,8 +22,9 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <CartProvider>
+          <SaleBanner />
           <Navbar />
-          <main className="min-h-screen pt-16">
+          <main className="min-h-screen pt-24">
             {children}
           </main>
           <Toaster />
