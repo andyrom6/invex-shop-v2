@@ -55,8 +55,6 @@ export async function POST(req: NextRequest) {
         currency: 'usd',
         product_data: {
           name: item.name,
-          images: item.images && item.images.length > 0 ? [item.images[0]] : [],
-          description: item.metadata?.description || '',
         },
         unit_amount: formatAmountForStripe(item.price, 'usd'),
       },
