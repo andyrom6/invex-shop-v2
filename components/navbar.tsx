@@ -6,8 +6,7 @@ import { useEffect, useState } from "react"
 import { ArrowRightIcon } from '@heroicons/react/24/outline'
 import { motion, AnimatePresence, useScroll, useMotionValueEvent } from "framer-motion"
 import { FaDiscord, FaTiktok } from 'react-icons/fa'
-import { ShoppingBag, X, Tag } from "lucide-react"
-import { SALE_ACTIVE, SALE_PERCENTAGE } from '@/lib/constants'
+import { ShoppingBag, X, Tag, Package } from "lucide-react"
 import { useCart } from '@/contexts/cart-context'
 import Image from 'next/image'
 
@@ -167,7 +166,7 @@ export default function Navbar() {
       <div className="relative px-4 sm:px-6 lg:px-8 flex h-16 items-center justify-between w-full max-w-7xl mx-auto">
         <div className="flex items-center">
           <Link href="/" className="text-2xl font-bold">
-            InvexShop
+            InvexSupplier
           </Link>
         </div>
 
@@ -252,12 +251,12 @@ export default function Navbar() {
               </Button>
             </Link>
             
-            <Link href="https://invex-pro-web.vercel.app/" target="_blank" rel="noopener noreferrer">
+            <Link href="/orders">
               <Button 
                 className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white border-0"
               >
-                Login to InvexPro
-                <ArrowRightIcon className="ml-2 h-4 w-4" />
+                Order Lookup
+                <Package className="ml-2 h-4 w-4" />
               </Button>
             </Link>
           </div>

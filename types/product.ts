@@ -13,12 +13,29 @@ export interface Product {
   price: number;
   currency: string;
   images: string[];
-  metadata: ProductMetadata;
+  metadata: {
+    category: string;
+    type: 'physical' | 'digital';
+    delivery: 'shipping' | 'download';
+  };
+  stock: number;
+  sku?: string;
+  createdAt: string;
+  tags?: string[];
+  featured?: boolean;
+  salePrice?: number;
+  onSale?: boolean;
 }
 
-export interface CartItem extends Omit<Product, 'images' | 'description'> {
+export interface CartItem {
+  id: string;
+  name: string;
+  price: number;
+  currency: string;
   image: string;
   quantity: number;
+  metadata: Product['metadata'];
+  onSale?: boolean;
+  salePrice?: number;
   originalPrice?: number;
-  saleActive?: boolean;
 }

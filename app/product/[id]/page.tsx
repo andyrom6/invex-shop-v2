@@ -2,15 +2,16 @@
 
 import Image from 'next/image'
 import { Button } from "@/components/ui/button"
-import { ShoppingCart, Star, Heart, Share2, Sparkles, Shield, Truck, RefreshCw, ArrowLeft } from "lucide-react"
-import { SALE_ACTIVE, SALE_DISCOUNT, SALE_PERCENTAGE } from '@/lib/constants'
+import { ShoppingCart, Star, Heart, Share2, Sparkles, Shield, Truck, RefreshCw, ArrowLeft, XCircle, AlertTriangle, Bell } from "lucide-react"
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { toast } from "sonner"
+import { toast } from 'react-hot-toast'
 import { motion, AnimatePresence } from "framer-motion"
 import { useCart } from '@/contexts/cart-context'
 import { Product } from '@/types/product'
 import Link from 'next/link'
+import { collection, query, where, getDocs } from 'firebase/firestore'
+import { db } from '@/lib/firebase'
 
 const ImageGallery = ({ images, name }: { images: string[], name: string }) => {
   const [selectedImage, setSelectedImage] = useState<string>(images[0])
@@ -95,42 +96,142 @@ const ProductFeatures = () => (
   </div>
 )
 
-const Reviews = () => (
-  <div className="mt-12">
-    <h2 className="text-2xl font-bold mb-6">Customer Reviews</h2>
-    <div className="space-y-6">
-      {[...Array(3)].map((_, i) => (
-        <motion.div
-          key={i}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: i * 0.1 }}
-          className="bg-white p-6 rounded-xl shadow-sm"
-        >
-          <div className="flex items-center mb-4">
-            <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-center text-white font-bold">
-              {String.fromCharCode(65 + i)}
-            </div>
-            <div className="ml-4">
-              <h4 className="font-semibold">Verified Buyer</h4>
-              <div className="flex items-center">
-                {[...Array(5)].map((_, j) => (
-                  <Star
-                    key={j}
-                    className="h-4 w-4 text-yellow-400 fill-yellow-400"
-                  />
-                ))}
+interface Review {
+  id: string;
+  productId: string;
+  productName: string;
+  reviewerName: string;
+  rating: number;
+  comment: string;
+  productImage?: string;
+  createdAt: any;
+}
+
+const Reviews = ({ productId }: { productId: string }) => {
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchReviews() {
+      try {
+        setLoading(true);
+        const reviewsQuery = query(
+          collection(db, "reviews")
+        );
+        
+        const querySnapshot = await getDocs(reviewsQuery);
+        const reviewsData: Review[] = [];
+        
+        querySnapshot.forEach((doc) => {
+          reviewsData.push({ id: doc.id, ...doc.data() } as Review);
+        });
+        
+        reviewsData.sort((a, b) => {
+          if (!a.createdAt) return 1;
+          if (!b.createdAt) return -1;
+          
+          const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+          const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+          
+          return timeB - timeA;
+        });
+        
+        setReviews(reviewsData);
+      } catch (error) {
+        console.error("Error fetching reviews:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    fetchReviews();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="mt-12">
+        <h2 className="text-2xl font-bold mb-6">Customer Reviews</h2>
+        <div className="flex justify-center py-8">
+          <motion.div 
+            className="w-10 h-10 rounded-full border-4 border-blue-600 border-t-transparent"
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (reviews.length === 0) {
+    return (
+      <div className="mt-12">
+        <h2 className="text-2xl font-bold mb-6">Customer Reviews</h2>
+        <div className="bg-gray-50 rounded-xl p-8 text-center">
+          <p className="text-gray-500">No reviews yet.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-12">
+      <h2 className="text-2xl font-bold mb-6">Customer Reviews</h2>
+      <div className="space-y-6">
+        {reviews.map((review, i) => (
+          <motion.div
+            key={review.id}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.1 }}
+            className="bg-white p-6 rounded-xl shadow-sm"
+          >
+            <div className="flex items-center mb-4">
+              <div className="h-10 w-10 rounded-full overflow-hidden bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-center text-white font-bold">
+                {review.reviewerName.charAt(0).toUpperCase()}
+              </div>
+              <div className="ml-4">
+                <h4 className="font-semibold">{review.reviewerName}</h4>
+                <div className="flex items-center">
+                  {[...Array(5)].map((_, j) => (
+                    <Star
+                      key={j}
+                      className={`h-4 w-4 ${
+                        j < review.rating 
+                          ? "text-yellow-400 fill-yellow-400" 
+                          : "text-gray-300"
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div className="ml-auto text-sm text-gray-500">
+                <span className="px-2 py-1 bg-gray-100 rounded-full">
+                  {review.productName}
+                </span>
               </div>
             </div>
-          </div>
-          <p className="text-gray-600">
-            Amazing product! Exactly what I was looking for. The quality is outstanding and delivery was super fast.
-          </p>
-        </motion.div>
-      ))}
+            
+            <p className="text-gray-600 mb-4">
+              {review.comment}
+            </p>
+            
+            {review.productImage && (
+              <div className="mt-4 rounded-lg overflow-hidden border border-gray-100">
+                <Image 
+                  src={review.productImage} 
+                  alt={`${review.productName} - Customer Photo`} 
+                  width={400} 
+                  height={300} 
+                  className="object-cover w-full h-48"
+                />
+              </div>
+            )}
+          </motion.div>
+        ))}
+      </div>
     </div>
-  </div>
-)
+  );
+};
 
 export default function ProductPage({ params }: { params: { id: string } }) {
   const [product, setProduct] = useState<Product | null>(null)
@@ -138,7 +239,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
   const [isAddingToCart, setIsAddingToCart] = useState(false)
   const [isFavorite, setIsFavorite] = useState(false)
   const router = useRouter()
-  const { triggerAnimation } = useCart()
+  const { addItem, removeItem, updateQuantity, clearCart, total } = useCart()
 
   useEffect(() => {
     async function loadProduct() {
@@ -164,44 +265,21 @@ export default function ProductPage({ params }: { params: { id: string } }) {
 
   async function addToCart(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
+    
     if (!product) return
+    
+    if (product.stock <= 0) {
+      toast.error(`Sorry, ${product.name} is currently out of stock`);
+      return;
+    }
 
     setIsAddingToCart(true)
     try {
-      const cartItem = {
-        id: product.id,
-        name: product.name,
-        price: product.price,
-        currency: product.currency,
-        image: product.images[0],
-        metadata: product.metadata,
-        quantity: 1
-      }
-
-      const response = await fetch('/api/cart', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          action: 'add',
-          item: cartItem
-        }),
-      })
-
-      if (!response.ok) {
-        const data = await response.json()
-        if (data.error?.includes('subscription')) {
-          throw new Error('You can only have one subscription in your cart')
-        }
-        throw new Error(data.error || 'Failed to add to cart')
-      }
-
+      const loadingToast = toast.loading('Adding to cart...');
+      await addItem(product)
+      toast.dismiss(loadingToast);
       toast.success('Added to cart!')
-      triggerAnimation()
-      router.refresh()
     } catch (error: any) {
-      console.error('Error adding to cart:', error)
       toast.error(error.message || 'Failed to add to cart')
     } finally {
       setIsAddingToCart(false)
@@ -367,13 +445,13 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.3 }}
             >
-              {SALE_ACTIVE ? (
+              {product.onSale && product.salePrice ? (
                 <>
                   <span className="text-5xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600">
                     {new Intl.NumberFormat('en-US', {
                       style: 'currency',
                       currency: product.currency,
-                    }).format(product.price * (1 - SALE_DISCOUNT))}
+                    }).format(product.salePrice)}
                   </span>
                   <span className="text-2xl font-medium text-gray-400 line-through">
                     {new Intl.NumberFormat('en-US', {
@@ -387,7 +465,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                     animate={{ scale: [1, 1.1, 1] }}
                     transition={{ duration: 2, repeat: Infinity }}
                   >
-                    -{SALE_PERCENTAGE}% OFF
+                    -{Math.round((1 - (product.salePrice / product.price)) * 100)}% OFF
                   </motion.span>
                 </>
               ) : (
@@ -399,6 +477,42 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                 </span>
               )}
             </motion.div>
+
+            <div className="mb-6">
+              {product.stock <= 0 ? (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex flex-col gap-2"
+                >
+                  <span className="inline-flex items-center gap-2 text-red-600 font-medium bg-red-50 px-3 py-2 rounded-lg">
+                    <XCircle className="h-5 w-5" />
+                    Out of Stock
+                  </span>
+                  <p className="text-sm text-gray-500">
+                    This product is currently unavailable. You can sign up to be notified when it's back in stock.
+                  </p>
+                </motion.div>
+              ) : product.stock <= 5 ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-2 text-amber-600 font-medium bg-amber-50 px-3 py-2 rounded-lg"
+                >
+                  <AlertTriangle className="h-5 w-5" />
+                  Low Stock - Only {product.stock} {product.stock === 1 ? 'item' : 'items'} left!
+                </motion.div>
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-2 text-green-600 font-medium bg-green-50 px-3 py-2 rounded-lg"
+                >
+                  <Truck className="h-5 w-5" />
+                  In Stock - Ready to Ship
+                </motion.div>
+              )}
+            </div>
 
             <div className="flex flex-wrap gap-2 mb-8">
               {Object.entries(product.metadata)
@@ -438,40 +552,80 @@ export default function ProductPage({ params }: { params: { id: string } }) {
             </div>
 
             <form onSubmit={addToCart}>
-              <motion.div
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <Button 
-                  type="submit" 
-                  size="lg" 
-                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-lg py-6 rounded-xl relative overflow-hidden"
-                  disabled={isAddingToCart}
-                >
+              {product.stock <= 0 ? (
+                <div className="space-y-4">
                   <motion.div
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                    animate={{
-                      x: ['-200%', '200%'],
-                    }}
-                    transition={{
-                      duration: 2,
-                      repeat: Infinity,
-                      ease: "linear",
-                    }}
-                  />
-                  <span className="relative z-10 flex items-center justify-center gap-2">
-                    <ShoppingCart className="h-5 w-5" />
-                    {isAddingToCart ? 'Adding to Cart...' : 'Add to Cart'}
-                  </span>
-                </Button>
-              </motion.div>
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <Button 
+                      type="button" 
+                      size="lg" 
+                      className="w-full bg-gray-100 text-gray-500 text-lg py-6 rounded-xl relative overflow-hidden cursor-not-allowed"
+                      disabled={true}
+                    >
+                      <span className="relative z-10 flex items-center justify-center gap-2">
+                        <XCircle className="h-5 w-5" />
+                        Out of Stock
+                      </span>
+                    </Button>
+                  </motion.div>
+                  
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="mt-4"
+                  >
+                    <Button 
+                      type="button" 
+                      variant="outline"
+                      size="lg" 
+                      className="w-full border-blue-600 text-blue-600 hover:bg-blue-50 text-lg py-6 rounded-xl"
+                      onClick={() => toast.success("We'll notify you when this product is back in stock!")}
+                    >
+                      <span className="flex items-center justify-center gap-2">
+                        <Bell className="h-5 w-5" />
+                        Notify Me When Available
+                      </span>
+                    </Button>
+                  </motion.div>
+                </div>
+              ) : (
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <Button 
+                    type="submit" 
+                    size="lg" 
+                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-lg py-6 rounded-xl relative overflow-hidden"
+                    disabled={isAddingToCart}
+                  >
+                    <motion.div
+                      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                      animate={{
+                        x: ['-200%', '200%'],
+                      }}
+                      transition={{
+                        duration: 2,
+                        repeat: Infinity,
+                        ease: "linear",
+                      }}
+                    />
+                    <span className="relative z-10 flex items-center justify-center gap-2">
+                      <ShoppingCart className="h-5 w-5" />
+                      {isAddingToCart ? 'Adding to Cart...' : 'Add to Cart'}
+                    </span>
+                  </Button>
+                </motion.div>
+              )}
             </form>
 
             <ProductFeatures />
           </motion.div>
         </div>
 
-        <Reviews />
+        <Reviews productId={params.id} />
       </div>
     </div>
   )

@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState, Suspense, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { CheckCircle, Package, Truck, ArrowRight, ShoppingBag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { getOrderByReference } from '@/lib/orders';
+import { getOrderByReference, updateOrderStatus, updateOrderWithStripeSession } from '@/lib/orders';
 import { Order } from '@/lib/orders';
 import { useCart } from '@/contexts/cart-context';
+import { sendOrderConfirmationEmailByReference } from '@/app/actions/email-actions';
+import { updateProductStock } from '@/lib/product-utils';
 
 // Component to handle search params
 function CheckoutSuccessContent() {
@@ -18,18 +20,114 @@ function CheckoutSuccessContent() {
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { clearCart } = useCart();
+  const cartCleared = useRef(false);
+  const orderUpdated = useRef(false);
+  const emailSent = useRef(false);
 
   useEffect(() => {
-    // Clear the cart when the success page loads
-    clearCart();
+    // Only clear the cart once to prevent infinite loops
+    if (!cartCleared.current) {
+      clearCart().catch(err => {
+        console.log("Failed to clear cart, but continuing:", err);
+      });
+      cartCleared.current = true;
+    }
     
     // Fetch order details if we have a reference
     if (orderReference) {
       fetchOrderDetails(orderReference);
+      
+      // Since we're not using webhooks, manually update the order status here
+      if (sessionId && orderReference && !orderUpdated.current) {
+        updateOrderAfterPayment(orderReference, sessionId);
+        orderUpdated.current = true;
+      }
     } else {
       setIsLoading(false);
     }
-  }, [orderReference, clearCart]);
+  }, [orderReference, sessionId]);
+
+  // Effect to send confirmation email once we have the order
+  useEffect(() => {
+    if (order && !emailSent.current && order.customerEmail && orderReference) {
+      // Instead of calling the email function directly, use the server action
+      sendConfirmationEmail(orderReference);
+      emailSent.current = true;
+    }
+  }, [order, orderReference]);
+
+  async function sendConfirmationEmail(orderRef: string) {
+    try {
+      console.log(`Requesting order confirmation email for ${orderRef}`);
+      
+      // Use the server action instead of the API endpoint
+      const result = await sendOrderConfirmationEmailByReference(orderRef);
+      
+      if (result.success) {
+        console.log('Order confirmation email sent successfully');
+      } else {
+        console.error(`Failed to send email: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error sending order confirmation email:', error);
+    }
+  }
+
+  async function updateOrderAfterPayment(reference: string, stripeSessionId: string) {
+    try {
+      // First check if the order exists in our database
+      const existingOrder = await getOrderByReference(reference);
+      
+      if (!existingOrder) {
+        console.log(`Order with reference ${reference} not found in database. This may be a test order or the order was not properly saved.`);
+        // Continue with the flow but don't try to update a non-existent order
+        return;
+      }
+      
+      // Only proceed with updates if the order exists
+      try {
+        // Update the order with the Stripe session ID only
+        await updateOrderWithStripeSession(reference, stripeSessionId);
+        
+        // Update the order status to 'processing'
+        await updateOrderStatus(reference, 'processing');
+        
+        console.log('Order updated successfully after payment');
+        
+        // Update product stock levels
+        if (existingOrder.items && existingOrder.items.length > 0) {
+          console.log(`Updating stock for order ${reference} with ${existingOrder.items.length} items`);
+          
+          try {
+            const stockUpdateResult = await updateProductStock(existingOrder.items);
+            
+            if (stockUpdateResult.success) {
+              console.log(`Successfully updated stock for order ${reference}`);
+              
+              if (stockUpdateResult.errors && stockUpdateResult.errors.length > 0) {
+                console.warn(`Some stock updates had issues: ${stockUpdateResult.errors.join(', ')}`);
+              }
+            } else {
+              console.error(`Failed to update stock for order ${reference}`);
+            }
+          } catch (stockError) {
+            console.error('Error updating product stock:', stockError);
+          }
+        } else {
+          console.warn(`No items found in order ${reference}, skipping stock update`);
+        }
+        
+        // Refresh order details to show updated status
+        fetchOrderDetails(reference);
+      } catch (updateError) {
+        console.error('Error updating order details:', updateError);
+        // Still try to fetch order details even if update failed
+        fetchOrderDetails(reference);
+      }
+    } catch (error) {
+      console.error('Error updating order after payment:', error);
+    }
+  }
 
   async function fetchOrderDetails(reference: string) {
     try {
@@ -98,12 +196,22 @@ function CheckoutSuccessContent() {
                         {order?.status || 'Processing'}
                       </span>
                     </div>
-                    {order && (
+                    {/* Discount Information */}
+                    {order?.discount && order.discount > 0 && (
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Total:</span>
-                        <span className="font-bold">${order.totalAmount.toFixed(2)}</span>
+                        <span className="text-gray-600">Discount:</span>
+                        <span className="text-red-500 font-medium">
+                          -${order.discount.toFixed(2)}
+                        </span>
                       </div>
                     )}
+                    {/* Total */}
+                    <div className="flex justify-between border-t pt-4 mt-4">
+                      <span className="font-semibold">Total:</span>
+                      <span className="font-bold text-lg">
+                        ${order?.totalAmount ? order.totalAmount.toFixed(2) : '0.00'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 

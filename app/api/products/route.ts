@@ -1,73 +1,83 @@
 import { NextResponse } from 'next/server';
-import { stripe } from '@/lib/stripe';
-import Stripe from 'stripe';
+import { db, storage } from '@/lib/firebase';
+import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { logger } from '@/lib/logger';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 export async function GET() {
   try {
-    const allProducts: Stripe.Product[] = [];
-    let hasMore = true;
-    let startingAfter: string | undefined;
+    const productsRef = collection(db, 'products');
+    const snapshot = await getDocs(productsRef);
+    const products = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
     
-    // Fetch all products using pagination
-    while (hasMore) {
-      const products = await stripe.products.list({
-        limit: 100, // Maximum allowed by Stripe
-        starting_after: startingAfter,
-        active: true, // Only fetch active products
-      });
-      
-      allProducts.push(...products.data);
-      hasMore = products.has_more;
-      startingAfter = products.data[products.data.length - 1]?.id;
-    }
+    return NextResponse.json(products);
+  } catch (error) {
+    logger.error('Error fetching products:', error);
+    return NextResponse.json({ error: 'Failed to fetch products' }, { status: 500 });
+  }
+}
 
-    console.log(`Fetched ${allProducts.length} products from Stripe`);
+export async function POST(request: Request) {
+  try {
+    const formData = await request.formData();
+    const images = formData.getAll('images');
     
-    const productsWithPrices = await Promise.all(
-      allProducts.map(async (product) => {
-        console.log('Processing product:', {
-          name: product.name,
-          metadata: {
-            category: product.metadata.category,
-            type: product.metadata.type,
-            delivery: product.metadata.delivery
+    // Upload images to Firebase Storage
+    const imageUrls = await Promise.all(
+      images.map(async (image) => {
+        // Check if image is a File object
+        if (image instanceof File) {
+          try {
+            const storageRef = ref(storage, `products/${Date.now()}-${image.name}`);
+            const snapshot = await uploadBytes(storageRef, image);
+            return getDownloadURL(snapshot.ref);
+          } catch (error) {
+            logger.error('Error uploading image:', error);
+            return ''; // Return empty string if upload fails
           }
-        });
-        
-        // Fetch prices for each product
-        const prices = await stripe.prices.list({ 
-          product: product.id,
-          active: true, // Only fetch active prices
-          limit: 1 // We only need the first price
-        });
-        
-        const price = prices.data[0];
-        if (!price) {
-          console.warn(`No active price found for product: ${product.name} (${product.id})`);
-          return null;
+        } else {
+          // If it's already a URL string, return it
+          return String(image);
         }
-
-        return {
-          id: product.id,
-          name: product.name,
-          description: product.description || '',
-          price: price.unit_amount! / 100,
-          currency: price.currency,
-          image: product.images[0] || '',
-          category: product.metadata.category,
-          type: product.metadata.type,
-          delivery: product.metadata.delivery,
-          isSubscription: product.metadata.isSubscription === 'true',
-        };
-      })
+      }).filter(url => url) // Filter out empty strings
     );
 
-    // Filter out any null values (products without prices)
-    const validProducts = productsWithPrices.filter((product): product is NonNullable<typeof product> => product !== null);
+    // Parse metadata from JSON string
+    let metadata;
+    try {
+      metadata = JSON.parse(formData.get('metadata') as string);
+    } catch (error) {
+      // Fallback if metadata isn't a valid JSON string
+      metadata = {
+        category: formData.get('category') || '',
+        type: formData.get('type') || 'physical',
+        delivery: formData.get('delivery') || 'shipping',
+      };
+    }
+
+    const productData = {
+      name: formData.get('name'),
+      description: formData.get('description'),
+      price: parseFloat(formData.get('price') as string),
+      currency: formData.get('currency'),
+      images: imageUrls,
+      metadata: metadata,
+      stock: parseInt(formData.get('stock') as string),
+      createdAt: new Date().toISOString(),
+      featured: formData.get('featured') === 'true',
+      onSale: formData.get('onSale') === 'true',
+      salePrice: formData.get('salePrice') ? parseFloat(formData.get('salePrice') as string) : undefined,
+    };
+
+    const productsRef = collection(db, 'products');
+    const docRef = await addDoc(productsRef, productData);
     
-    return NextResponse.json(validProducts);
+    return NextResponse.json({ id: docRef.id, ...productData });
   } catch (error) {
-    console.error('Error fetching products:', error);
-    return NextResponse.json({ error: 'Failed to fetch products' }, { status: 500 });
+    logger.error('Error creating product:', error);
+    return NextResponse.json({ error: 'Failed to create product' }, { status: 500 });
   }
 }

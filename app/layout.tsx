@@ -1,12 +1,16 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
-import Navbar from '@/components/navbar';
-import { Toaster } from "sonner";
+import { Toaster } from 'react-hot-toast';
 import { CartProvider } from '@/contexts/cart-context';
-import { SaleBanner } from '@/components/sale-banner';
+import { AuthProvider } from '@/contexts/auth-context';
+import { ConditionalNavbar } from '@/components/conditional-navbar';
+import { ConditionalMain } from '@/components/conditional-main';
 
-const inter = Inter({ subsets: ['latin'] });
+const inter = Inter({ 
+  subsets: ['latin'],
+  display: 'swap', // Optimize font loading
+});
 
 export const metadata: Metadata = {
   title: 'InvexShop - Premium Tech Gadgets',
@@ -21,14 +25,15 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <CartProvider>
-          <SaleBanner />
-          <Navbar />
-          <main className="min-h-screen pt-24">
-            {children}
-          </main>
-          <Toaster />
-        </CartProvider>
+        <AuthProvider>
+          <CartProvider>
+            <ConditionalNavbar />
+            <ConditionalMain>
+              {children}
+            </ConditionalMain>
+            <Toaster />
+          </CartProvider>
+        </AuthProvider>
       </body>
     </html>
   );

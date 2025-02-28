@@ -1,4 +1,8 @@
 import { ProductMetadata } from '@/types/product';
+import { db } from '@/lib/firebase';
+import { doc, getDoc, updateDoc, runTransaction } from 'firebase/firestore';
+import { logger } from '@/lib/logger';
+import { OrderItem } from './orders';
 
 export function isSubscriptionProduct(metadata: ProductMetadata): boolean {
   return metadata.isSubscription === 'true';
@@ -15,17 +19,6 @@ export function isPhysicalProduct(metadata: ProductMetadata): boolean {
     category === 'cologne' ||
     delivery.includes('days')
   );
-}
-
-export function formatPrice(amount: number, currency: string): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: currency,
-  }).format(amount);
-}
-
-export function calculateTotal(items: { price: number; quantity: number }[]): number {
-  return items.reduce((total, item) => total + (item.price * item.quantity), 0);
 }
 
 export function getProductImage(image: string | undefined): string {
@@ -53,11 +46,68 @@ export function getProductImage(image: string | undefined): string {
   }
 }
 
-export function validateProductImage(image: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => resolve(true);
-    img.onerror = () => resolve(false);
-    img.src = image;
-  });
+/**
+ * Update product stock after a successful order
+ * @param orderItems Array of order items with product IDs and quantities
+ * @returns Object with success status and any errors
+ */
+export async function updateProductStock(orderItems: OrderItem[]): Promise<{
+  success: boolean;
+  errors?: string[];
+}> {
+  try {
+    const errors: string[] = [];
+    
+    // Use a transaction to ensure all stock updates are atomic
+    await runTransaction(db, async (transaction) => {
+      // Process each order item
+      for (const item of orderItems) {
+        const productId = item.id;
+        const quantity = item.quantity;
+        
+        if (!productId || !quantity) {
+          errors.push(`Invalid product ID or quantity for item: ${item.name}`);
+          continue;
+        }
+        
+        // Get the product document
+        const productRef = doc(db, 'products', productId);
+        const productDoc = await transaction.get(productRef);
+        
+        if (!productDoc.exists()) {
+          errors.push(`Product not found: ${productId}`);
+          continue;
+        }
+        
+        const productData = productDoc.data();
+        const currentStock = productData.stock || 0;
+        
+        // Calculate new stock level
+        const newStock = Math.max(0, currentStock - quantity);
+        
+        // Log if we're out of stock
+        if (newStock === 0) {
+          logger.warn(`Product ${productData.name} (${productId}) is now out of stock`);
+        } else if (newStock < 5) {
+          logger.warn(`Product ${productData.name} (${productId}) is running low: ${newStock} remaining`);
+        }
+        
+        // Update the product stock
+        transaction.update(productRef, { stock: newStock });
+        
+        logger.info(`Updated stock for product ${productId}: ${currentStock} → ${newStock}`);
+      }
+    });
+    
+    return {
+      success: true,
+      errors: errors.length > 0 ? errors : undefined
+    };
+  } catch (error) {
+    logger.error('Error updating product stock:', error);
+    return {
+      success: false,
+      errors: ['Failed to update product stock']
+    };
+  }
 }

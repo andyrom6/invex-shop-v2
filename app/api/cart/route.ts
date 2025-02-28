@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { isSubscriptionProduct } from '@/lib/product-utils';
 import { ProductMetadata, CartItem } from '@/types/product';
-import { SALE_ACTIVE, SALE_DISCOUNT } from '@/lib/constants';
 import { z } from 'zod';
 
 // Validation schemas
@@ -27,7 +26,8 @@ const CartActionSchema = z.discriminatedUnion('action', [
       image: z.string(),
       metadata: ProductMetadataSchema,
       originalPrice: z.number().positive().optional(),
-      saleActive: z.boolean().optional()
+      onSale: z.boolean().optional(),
+      salePrice: z.number().positive().optional()
     })
   }),
   z.object({
@@ -113,13 +113,35 @@ export async function POST(request: Request) {
             cart[existingItemIndex].quantity += 1;
           }
         } else {
-          // Apply sale discount if active
-          if (SALE_ACTIVE) {
-            item.originalPrice = item.price;
-            item.price = item.price * (1 - SALE_DISCOUNT);
-            item.saleActive = true;
-          }
-          cart.push(item);
+          // Update the cart item creation to use product's onSale and salePrice
+          const cartItem = {
+            id: item.id,
+            name: item.name,
+            price: item.onSale && item.salePrice ? item.salePrice : item.price,
+            originalPrice: item.onSale && item.salePrice ? item.price : undefined,
+            currency: item.currency,
+            image: item.image,
+            quantity: 1,
+            onSale: item.onSale || false,
+            salePrice: item.salePrice,
+            metadata: {
+              category: item.metadata.category || '',
+              type: item.metadata.type || 'physical',
+              delivery: item.metadata.delivery || 'shipping',
+            }
+          };
+          
+          // Ensure metadata fields have default values
+          item.metadata = {
+            category: item.metadata.category || '',
+            type: item.metadata.type || 'physical',
+            delivery: item.metadata.delivery || 'shipping',
+            isSubscription: item.metadata.isSubscription,
+            requires_shipping: item.metadata.requires_shipping
+          };
+          
+          // Use type assertion to satisfy the CartItem type
+          cart.push(cartItem as CartItem);
         }
         break;
       }
@@ -155,13 +177,20 @@ export async function POST(request: Request) {
     });
 
     // Set cookie in response
-    cookies().set('cart', JSON.stringify(cart), {
+    console.log('Setting cart cookie with data:', JSON.stringify(cart));
+    
+    // Set the cookie directly on the response object
+    response.cookies.set({
+      name: 'cart',
+      value: JSON.stringify(cart),
       path: '/',
       maxAge: 60 * 60 * 24 * 7, // 1 week
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       httpOnly: true,
     });
+    
+    console.log('Cookie set on response object');
 
     return response;
 
